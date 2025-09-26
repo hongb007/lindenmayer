@@ -34,7 +34,6 @@ class LSystem:
         valid_outputs_sorted = sorted(
             valid_outputs, key=lambda chance: chance["chance"]
         )
-        print(valid_outputs_sorted)
 
         for i in range(0, len(valid_outputs_sorted)):
             # Get the numeric chance value first
@@ -44,35 +43,37 @@ class LSystem:
             if current_chance != 0:
                 added_prob += current_chance
                 if chance_limit <= added_prob:
-                    return valid_outputs_sorted[i]["new_symbol"]
+                    return len(valid_outputs_sorted[i]["symbol"]), valid_outputs_sorted[i]["new_symbol"]
 
-        return initial_state[current_index]
+        return 1, initial_state[current_index]
 
     def iterate(self, iterations: int) -> None:
         def step(input_state: str, rule: Rule) -> str:
             new_state = ""
-
-            for i in range(0, len(input_state)):
-                new_symbol = self.match_rule(rule, input_state, i)
+            i = 0
+            
+            while i < len(input_state):
+                old_symbol_length, new_symbol = self.match_rule(rule, input_state, i)
                 new_state += new_symbol
+                i += old_symbol_length
 
             return new_state
 
         new_state = self.state
 
         for i in range(0, iterations):
-            new_state = step(new_state, rule)
+            new_state = step(new_state, self.rule)
 
         self.state = new_state
 
 
 if __name__ == "__main__":
-    axiom, rule = BASIC_EXAMPLE
+    name, axiom, rule = BASIC_EXAMPLE
     lsystem = LSystem(axiom=axiom, rule=rule)
     lsystem.iterate(iterations=2)
     print(lsystem.state)
 
-    axiom, rule = TREE_EXAMPLE
+    name, axiom, rule = TREE_EXAMPLE
     lsystem = LSystem(axiom=axiom, rule=rule)
     lsystem.iterate(iterations=1)
     print(lsystem.state)
