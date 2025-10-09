@@ -16,7 +16,10 @@ class LSystem:
         self.axiom = axiom
         self.rule = rule
         self.state = axiom.initial_state
-
+        
+    def remove_symbol(self, symbol: str):
+        self.state = self.state.replace(symbol, '')
+                
     def match_rule(self, rule: Rule, initial_state: str, current_index: int):
         valid_outputs = []
         chance_limit = np.random.uniform(0, 1)
@@ -31,21 +34,30 @@ class LSystem:
             ):
                 valid_outputs.append(rule.list[i])
 
-        valid_outputs_sorted = sorted(
-            valid_outputs, key=lambda chance: chance["chance"]
-        )
+        # If no rules matched at all, the character is unchanged.
+        if not valid_outputs:
+            return 1, initial_state[current_index]
 
-        for i in range(0, len(valid_outputs_sorted)):
-            # Get the numeric chance value first
-            current_chance = valid_outputs_sorted[i]["chance"]
+        # First, find the length of the longest symbol among all matches.
+        longest_symbol_len = len(max(valid_outputs, key=lambda r: len(r["symbol"]))["symbol"])
 
-            # Only process if the chance is not zero
+        # Then, filter the list to only include rules for that longest symbol.
+        prioritized_rules = [
+            r for r in valid_outputs if len(r["symbol"]) == longest_symbol_len
+        ]
+        
+        chance_limit = np.random.uniform(0, 1)
+        added_prob = 0
+
+        for i in range(0, len(prioritized_rules)):
+            current_chance = prioritized_rules[i]["chance"]
             if current_chance != 0:
                 added_prob += current_chance
                 if chance_limit <= added_prob:
-                    return len(valid_outputs_sorted[i]["symbol"]), valid_outputs_sorted[i]["new_symbol"]
+                    return len(prioritized_rules[i]["symbol"]), prioritized_rules[i]["new_symbol"]
 
-        return 1, initial_state[current_index]
+        # If no probabilistic rule was chosen, return the original (longest) matched symbol.
+        return longest_symbol_len, initial_state[current_index : current_index + longest_symbol_len]
 
     def iterate(self, iterations: int) -> None:
         def step(input_state: str, rule: Rule) -> str:
