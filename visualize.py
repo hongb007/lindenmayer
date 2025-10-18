@@ -189,4 +189,5 @@ def run_visualization_cli(trees_dir="results/trees"):
 
 # --- Main Execution ---
 if __name__ == "__main__":
-    run_visualization_cli()
+    # For the worlds currently
+    run_visualization_cli(trees_dir="results/trees/worlds")

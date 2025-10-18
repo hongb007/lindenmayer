@@ -8,14 +8,15 @@ from utils.axiom import Axiom
 from utils.rule import Rule
 from utils.constants import BASIC_EXAMPLE, TREE_EXAMPLE
 
-np.random.seed(0)
-
-
 class LSystem:
     def __init__(self, axiom: Axiom, rule: Rule) -> None:
         self.axiom = axiom
         self.rule = rule
         self.state = axiom.initial_state
+        self.matched_rules = {} # Dictionary to help keep track of rule matches
+        for r in rule.list:
+            rule_key = f"{r['symbol']} -> {r['new_symbol']}"
+            self.matched_rules[rule_key] = 0
         
     def remove_symbol(self, symbol: str):
         self.state = self.state.replace(symbol, '')
@@ -54,6 +55,8 @@ class LSystem:
             if current_chance != 0:
                 added_prob += current_chance
                 if chance_limit <= added_prob:
+                    rule_key = f"{prioritized_rules[i]['symbol']} -> {prioritized_rules[i]['new_symbol']}"
+                    self.matched_rules[rule_key] += 1
                     return len(prioritized_rules[i]["symbol"]), prioritized_rules[i]["new_symbol"]
 
         # If no probabilistic rule was chosen, return the original (longest) matched symbol.
@@ -77,9 +80,24 @@ class LSystem:
             new_state = step(new_state, self.rule)
 
         self.state = new_state
+        
+    def get_rule_statistics(self) -> list[str | int]:
+        # print("\nRule application statistics:")
+        # print("---------------------------")
+        
+        list = []
+        
+        for rule_str, count in self.matched_rules.items():
+            list.append([f"{rule_str}", count])
+            
+        return list
+        
+        # print("---------------------------")
 
 
 if __name__ == "__main__":
+    np.random.seed(0)
+    
     name, axiom, rule = BASIC_EXAMPLE
     lsystem = LSystem(axiom=axiom, rule=rule)
     lsystem.iterate(iterations=2)

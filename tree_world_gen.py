@@ -8,43 +8,26 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from algorithm.lsystem import LSystem
 from algorithm.lsystem_tree import LSystemTree
-from utils.constants import ZONO_TREE, ZONO_TREE_SPARSE
+from utils.constants import ZONO_TREE
 
 np.random.seed(0)
 
-plant_list = [ZONO_TREE_SPARSE]
+num_worlds = 100
+plant = ZONO_TREE
 
-for plant in plant_list:
+for i in range(0,num_worlds):
     name, axiom, rule = plant
     lsystem = LSystem(axiom=axiom, rule=rule)
     
-    batches = True
+    batches = False
 
-    # Use n=7 iterations for bush as specified in the figure
-    # iterations = 7 if name == "bush_3d" else 5
-    if plant_list == [ZONO_TREE]:
+    if plant == ZONO_TREE:
         iterations = 7
         remove_a_string = True
         branch_length = 0.2
         angle = 22.5
-        initial_diameter = 0.10 # 1.25
-        diameter_scale = 0.9 # 0.85
-        num_batches = 2
-    elif plant_list == [ZONO_TREE_SPARSE]:
-        iterations = 7
-        remove_a_string = True
-        branch_length = 0.2
-        angle = 22.5
-        initial_diameter = 0.10 # 1.25
-        diameter_scale = 0.9 # 0.85
-        num_batches = 2
-    else:
-        iterations = 5
-        remove_a_string = False
-        branch_length = 0.2
-        angle = 22.5
-        initial_diameter = 10.0
-        diameter_scale = 0.85
+        initial_diameter = 0.10 
+        diameter_scale = 0.9 
         num_batches = 1
 
     lsystem.iterate(iterations=iterations)
@@ -53,11 +36,8 @@ for plant in plant_list:
 
     string = lsystem.state
 
-    print(f"Processing L-System String: {string}\n")
+    # print(f"Processing L-System String: {string}\n")
 
-    # angle = 22.5 if name == "bush_3d" else 40
-    # if name == "seth_tree":
-    #     angle = 26
     lsystem_tree = LSystemTree(
         string,
         branch_length=0.2,
@@ -66,18 +46,11 @@ for plant in plant_list:
         diameter_scale=diameter_scale,
     )
 
-    # Print the hierarchical structure of the tree
-    # print("--- Tree Structure ---")
-    # lsystem_tree.show()
-
     # Get the list of branches
-    if batches:
-        all_trees = lsystem_tree.generate_batch_trees(num_batches=num_batches)
-        name = name + "_batches"
-    else:
-        all_trees = lsystem_tree.generate_batch_trees(num_batches=num_batches)
+    all_trees = lsystem_tree.generate_batch_trees(num_batches=1)
 
     all_batches_data = []
+    all_branch_length_data = []
 
     print("\n--- Branch List ---")
     print("Format: (start_point, end_point, branch_type, diameter)")
@@ -102,6 +75,7 @@ for plant in plant_list:
             "btype": b_type,
             "diameter": b_diameter,
         })
+        all_branch_length_data.append(len(tree_branches))
 
     # The final dictionary now contains a list of batches
     stats = {
@@ -113,11 +87,13 @@ for plant in plant_list:
         "initial_diameter": initial_diameter,
         "diameter_scale": diameter_scale,
         "num_batches": num_batches,
+        "branch_lengths": all_branch_length_data,
+        "matched_rules_num": lsystem.get_rule_statistics(),
         "batches": all_batches_data,
     }
-    os.makedirs(os.path.join(os.getcwd(), "results", "trees"), exist_ok=True)
+    os.makedirs(os.path.join(os.getcwd(), "results", "trees", "worlds"), exist_ok=True)
 
-    with open(f"results/trees/lsystem_{name}.json", "w") as f:
+    with open(f"results/trees/worlds/lsystem_{i}_{name}.json", "w") as f:
         json.dump(stats, f, indent=2)
         
-    print(f"Saved to: results/trees/lsystem_{name}.json")
+    print(f"Saved to: results/trees/worlds/lsystem_{i}_{name}.json")

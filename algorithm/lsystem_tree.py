@@ -195,8 +195,8 @@ class LSystemTree:
         plt.show()
 
 
-# --- Example Usage ---
 if __name__ == "__main__":
+    np.random.seed(0)
     name, axiom, rule = ZONO_TREE
     lsystem = LSystem(axiom=axiom, rule=rule)
     lsystem.iterate(iterations=7) # zono_tree = 7
@@ -205,6 +205,7 @@ if __name__ == "__main__":
     string = lsystem.state
 
     print(f"Processing L-System for '{name}' with {len(string)} commands...")
+    print(lsystem.get_rule_statistics())
 
     # 2. Create the visualizer object, which processes the string automatically
     tree_viz = LSystemTree(string, branch_length=0.2, angle_deg=22.5, initial_diameter=10.0, diameter_scale=0.85) # zono tree = 22.5

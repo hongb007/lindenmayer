@@ -5,6 +5,7 @@ class Rule:
     ) -> None:
         self.list = self.process_rules(input_rules=input_rules)
         
+        
     def process_rules(self, input_rules: list[list[str | float]]):
         processed_rules = []
         

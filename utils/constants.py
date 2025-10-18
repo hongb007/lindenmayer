@@ -175,10 +175,12 @@ ZONO_TREE = [
     Rule(
         [
             # Initial trunk rule - creates visible trunk before branching
-            ["T", "III!IIII!IIII!IIII!!!A", 1.0],  # Draw trunk then start main growth
+            ["T", "III!IIII!IIII!IIII!!!B", 1.0],  # Draw trunk then start main growth
             
             # p₁: A → [&FL!A]/////'[&FL!A]////////'[&FL!A]
             # This creates three main branches with different roll orientations
+            ["B", "[FL!A][&FL!A]/////'[&&FL!A]////////'[&FL!A]", 1.0],
+            
             ["A", "[FL!A][&FL!A]/////'[&&FL!A]////////'[&FL!A]", 0.6],
             ["A", "/////'[&&&FL!A]/////'[&FL!A]////////'[&&FL!A]////////'[&&FL!A]", 0.15],
             ["A", "'[&&&FL!A]", 0.25],
@@ -193,6 +195,48 @@ ZONO_TREE = [
             # Longer segments become forward + leaf
             ["S", "!FL", 0.7],
             ["S", "L", 0.3],
+            
+            # p₄: L → [''^∧∧{-f+f+f-|-f+f+f}]
+            # Leaves create detailed polygonal structures
+            # ["L", "[!!''^∧∧{-C+C+C-|-C+C+C}]", 1.0],
+        ]
+    ),
+]
+
+ZONO_TREE_SPARSE = [
+    "zono_tree_sparse",
+    Axiom("T"),  # ω : A
+    Rule(
+        [
+            # Initial trunk rule - creates visible trunk before branching
+            ["T", "III!IIII!IIII!IIII!!!B", 1.0],  # Draw trunk then start main growth
+            
+            ["B", "[FL!A][&FL!A]/////'[&&FL!A]////////'[&FL!A]", 1.0],
+            
+            # p₁: A → [&FL!A]/////'[&FL!A]////////'[&FL!A]
+            # ["A", "[FL!A][&FL!A]/////'[&&FL!A]////////'[&FL!A]", 0.6],
+            # ["A", "/////'[&&&FL!A]/////'[&FL!A]////////'[&&FL!A]////////'[&&FL!A]", 0.15],
+            # ["A", "'[&&&FL!A]", 0.25],
+            ["A", "[FL!A][&FL!A]/////'[&&FL!A]////////'[&FL!A]", 0.30],
+            ["A", "/////'[&&&FL!A]/////'[&FL!A]////////'[&&FL!A]////////'[&&FL!A]", 0.15],
+            ["A", "'[&&&FL!A]", 0.15],
+            ["A", "L", 0.4],  # New rule: 40% chance to just terminate with a leaf
+            
+            # p₂: F → S/////F  
+            # Forward segments become longer segments with roll
+            ["F", "S/////F", 0.7],
+            ["F", "S", 0.3],
+
+            
+            # p₃: S → FL
+            # Longer segments become forward + leaf
+            # ["S", "!FL", 0.7],
+            # ["S", "L", 0.3],
+            
+            # Less dense version:
+            ["S", "!FL", 0.4],  # Reduced from 0.7 to 0.4
+            ["S", "L", 0.2],    # Reduced from 0.3 to 0.2
+            ["S", "F", 0.4],    # New rule: 40% chance to just continue without leaves
             
             # p₄: L → [''^∧∧{-f+f+f-|-f+f+f}]
             # Leaves create detailed polygonal structures
