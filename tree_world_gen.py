@@ -46,18 +46,20 @@ for i in range(0,num_worlds):
         diameter_scale=diameter_scale,
     )
 
-    # Get the list of branches
-    all_trees = lsystem_tree.generate_batch_trees(num_batches=1)
+    # Get the list of branches and grouped branches
+    all_trees_list, all_trees_grouped = lsystem_tree.generate_batch_trees(num_batches=1)
 
     all_batches_data = []
+    all_batches_grouped_data = []  # New list for grouped branches
     all_branch_length_data = []
 
     print("\n--- Branch List ---")
     print("Format: (start_point, end_point, branch_type, diameter)")
 
     # Handle batched trees (list of branch lists)
-    for tree_idx, tree_branches in enumerate(all_trees):
+    for tree_idx, tree_branches in enumerate(all_trees_list):
         print(f"Tree {tree_idx + 1}: {len(tree_branches)} branches")
+        
         
         # Create lists for the current batch
         b_start, b_end, b_type, b_diameter = [], [], [], []
@@ -76,8 +78,38 @@ for i in range(0,num_worlds):
             "diameter": b_diameter,
         })
         all_branch_length_data.append(len(tree_branches))
+    
+    # Process the grouped branches
+    for tree_idx, tree_grouped_branches in enumerate(all_trees_grouped):
+        print(f"Tree {tree_idx + 1}: {len(tree_grouped_branches)} branch groups")
+        
+        # Create a list of groups for this tree
+        tree_groups = []
+        
+        for group_idx, group in enumerate(tree_grouped_branches):
+            # Create lists for the current group
+            g_start, g_end, g_type, g_diameter = [], [], [], []
+            
+            for start, end, btype, diameter in group:
+                g_start.append(start.tolist())
+                g_end.append(end.tolist())
+                g_type.append(btype)
+                g_diameter.append(diameter)
+            
+            # Append the dictionary for this group
+            tree_groups.append({
+                "start": g_start,
+                "end": g_end,
+                "btype": g_type,
+                "diameter": g_diameter,
+            })
+        
+        # Add this tree's grouped data
+        all_batches_grouped_data.append(tree_groups)
+        
+    # estimated_groups = lsystem.estimate_branch_groups(string)
+    # print(f"Estimated groups: {estimated_groups}")
 
-    # The final dictionary now contains a list of batches
     stats = {
         "name": name,
         "iterations": iterations,
@@ -89,6 +121,7 @@ for i in range(0,num_worlds):
         "num_batches": num_batches,
         "branch_lengths": all_branch_length_data,
         "matched_rules_num": lsystem.get_rule_statistics(),
+        "batches_grouped": all_batches_grouped_data,
         "batches": all_batches_data,
     }
     os.makedirs(os.path.join(os.getcwd(), "results", "trees", "worlds"), exist_ok=True)

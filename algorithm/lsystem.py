@@ -94,6 +94,34 @@ class LSystem:
         
         # print("---------------------------")
 
+    def estimate_branch_groups(self, string=None):
+        """
+        Estimate branch groups using a simple bracket count.
+        
+        Returns number of estimated groups
+        """
+        if string is None:
+            string = self.state
+            
+        rotation_chars = set(["+", "-", "&", "^", "/", "\\", "|"])
+        
+        i = 0
+        count = 0
+        
+        while i < len(string) - 1:
+            if(string[i] == "[" and string[i+1] in rotation_chars):
+                count += 1
+            i += 1
+        
+        bracket_count = string.count("[")
+        
+        
+        # Estimate groups as: 
+        # 1 (initial trunk) + number of branch points
+        estimated_groups = bracket_count + 1
+        
+        return count
+
 
 if __name__ == "__main__":
     np.random.seed(0)

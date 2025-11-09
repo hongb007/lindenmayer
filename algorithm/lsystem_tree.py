@@ -7,18 +7,32 @@ import matplotlib.pyplot as plt
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from algorithm.lsystem import LSystem
-from utils.constants import TREE_EXAMPLE, SETH_TREE, BUSH_3D, ZONO_TREE, REALISTIC_TREE, PLANT_SYSTEM
+from utils.constants import (
+    TREE_EXAMPLE,
+    SETH_TREE,
+    BUSH_3D,
+    ZONO_TREE,
+    REALISTIC_TREE,
+    PLANT_SYSTEM,
+)
 
 
 class LSystemTree:
     """
-    Parses a 3D L-system string and generates its geometric representation for visualization.
+    Parses a 3D L-systems string and generates its geometric representation for visualization.
 
     This version uses scipy.spatial.transform.Rotation for robust and simple
     handling of 3D orientations.
     """
 
-    def __init__(self, lsystem_string, branch_length=1.0, angle_deg=22.5, initial_diameter=1.0, diameter_scale=0.8):
+    def __init__(
+        self,
+        lsystem_string,
+        branch_length=1.0,
+        angle_deg=22.5,
+        initial_diameter=1.0,
+        diameter_scale=0.8,
+    ):
         """
         Initializes and processes the L-system string.
 
@@ -39,7 +53,7 @@ class LSystemTree:
         self._setup_rotations()
 
         # Generate the list of branches upon instantiation
-        self.branches = self._generate_branches()
+        self.branches, self.branch_groups = self._generate_branches()
 
     def _setup_rotations(self):
         """Pre-computes the rotation objects for cleaner processing."""
@@ -64,10 +78,10 @@ class LSystemTree:
 
     def _generate_branches(self, position=np.array([0.0, 0.0, 0.0])):
         """
-        Parses the L-system string using a 3D turtle and returns a list of branches.
-        Now includes diameter tracking with the '!' symbol.
+        Parses the L-system string and returns branches grouped by alignment.
+        Each group contains branches that are in a straight line.
         """
-        branches = []
+        branches = []  # For flat list compatibility
         stack = []
         orientation = Rotation.identity()
         current_diameter = self.initial_diameter
@@ -95,15 +109,63 @@ class LSystemTree:
 
                 start_point = position
                 end_point = start_point + heading_vec * self.branch_length
-                # Now store branches as (start, end, type, diameter)
-                branches.append((start_point, end_point, char, current_diameter))
-                position = end_point  # Move to the new position
+
+                # Store branch with its direction vector
+                new_branch = (start_point, end_point, char, current_diameter, heading_vec)
+                branches.append(new_branch)
+                position = end_point
 
             elif char == "f":  # Move forward without drawing
                 heading_vec = orientation.apply(self.FWD_AXIS)
                 position += heading_vec * self.branch_length
 
-        return branches
+        # Now group branches by direction AND spatial connectivity
+        branch_groups = []
+        used = [False] * len(branches)
+        angle_threshold = np.radians(0.1)  # Small angle tolerance for alignment
+        position_threshold = 1e-6  # Tolerance for end-to-start connection
+
+        for i, (start_i, end_i, type_i, diam_i, dir_i) in enumerate(branches):
+            if used[i]:
+                continue
+
+            # Start a new group with this branch
+            current_group = [(start_i, end_i, type_i, diam_i)]
+            used[i] = True
+            current_end = end_i
+
+            # Try to extend the group by finding connected branches with similar direction
+            found_continuation = True
+            while found_continuation:
+                found_continuation = False
+                
+                for j in range(len(branches)):
+                    if used[j]:
+                        continue
+
+                    start_j, end_j, type_j, diam_j, dir_j = branches[j]
+
+                    # Check if this branch connects to the end of our current chain
+                    distance_to_current = np.linalg.norm(start_j - current_end)
+                    
+                    if distance_to_current < position_threshold:
+                        # Check if directions are similar (angle between them is small)
+                        dot_product = np.dot(dir_i, dir_j)
+                        angle_diff = np.arccos(np.clip(dot_product, -1.0, 1.0))
+
+                        if angle_diff < angle_threshold:
+                            current_group.append((start_j, end_j, type_j, diam_j))
+                            used[j] = True
+                            current_end = end_j
+                            found_continuation = True
+                            break  # Start over to find next connected branch
+
+            branch_groups.append(current_group)
+
+        # Convert branches back to 4-tuple format (without direction vector)
+        branches = [(s, e, t, d) for s, e, t, d, _ in branches]
+
+        return branches, branch_groups
 
     def generate_batch_trees(
         self, world_bounds=np.array([0.0, -10.0, 0.0, 25.0, 10.0, 10.0]), num_batches=1
@@ -125,27 +187,30 @@ class LSystemTree:
             )
 
         total_branches = []
+        total_branch_groups = []
         buffer = 6
 
-        # Extract bounds for clarity
-        x_min, y_min, z_min = world_bounds[0], world_bounds[1], world_bounds[2]
-        x_max, y_max, z_max = world_bounds[3], world_bounds[4], world_bounds[5]
+        # For if random starting pose
+        # x_min, y_min, z_min = world_bounds[0], world_bounds[1], world_bounds[2]
+        # x_max, y_max, z_max = world_bounds[3], world_bounds[4], world_bounds[5]
 
-        # Ensure we have enough space after applying buffer
-        if (x_max - x_min) <= 2 * buffer or (y_max - y_min) <= 2 * buffer:
-            print(f"Warning: Buffer ({buffer}) may be too large for world bounds")
+        # # Ensure we have enough space after applying buffer
+        # if (x_max - x_min) <= 2 * buffer or (y_max - y_min) <= 2 * buffer:
+        #     print(f"Warning: Buffer ({buffer}) may be too large for world bounds")
 
         for i in range(num_batches):
             # Generate random position within buffered bounds
-            x = np.random.uniform(x_min + buffer, x_max - buffer)
-            y = np.random.uniform(y_min + buffer, y_max - buffer)
-            z = z_min
+            # x = np.random.uniform(x_min + buffer, x_max - buffer)
+            # y = np.random.uniform(y_min + buffer, y_max - buffer)
+            # z = z_min
 
-            pos = np.array([x, y, z])
-            tree_branches = self._generate_branches(position=pos)
-            total_branches.append(tree_branches)
+            # pos = np.array([x, y, z])
+            
+            flat_branches, grouped_branches = self._generate_branches()
+            total_branches.append(flat_branches)
+            total_branch_groups.append(grouped_branches)
 
-        return total_branches
+        return total_branches, total_branch_groups
 
     def visualize_3d(
         self,
@@ -174,7 +239,9 @@ class LSystemTree:
             # Use diameter to set linewidth (with a minimum width)
             linewidth = max(0.5, diameter * 2.0)
             ax.plot(
-                *zip(start, end), color=branch_colors.get(btype, "gray"), linewidth=linewidth
+                *zip(start, end),
+                color=branch_colors.get(btype, "gray"),
+                linewidth=linewidth,
             )
             all_points.extend([start, end])
 
@@ -194,22 +261,96 @@ class LSystemTree:
         plt.tight_layout()
         plt.show()
 
+    def visualize_grouped_branches(
+        self,
+        title="Grouped Branches Visualization",
+        figsize=(12, 9),
+        elev=25,
+        azim=-60,
+        num_colors=20,
+    ):
+        """Visualizes branches grouped by their alignment with randomly assigned colors from a fixed palette."""
+        fig = plt.figure(figsize=figsize)
+        ax = fig.add_subplot(111, projection="3d")
+
+        all_points = [np.array([0.0, 0.0, 0.0])]
+
+        # Define a distinct color palette (20 visually distinct colors)
+        color_palette = [
+            "#e6194b", "#3cb44b", "#ffe119", "#4363d8", "#f58231",
+            "#911eb4", "#46f0f0", "#f032e6", "#bcf60c", "#fabebe",
+            "#008080", "#e6beff", "#9a6324", "#fffac8", "#800000",
+            "#aaffc3", "#808000", "#ffd8b1", "#000075", "#808080"
+        ]
+        
+        # Trim or extend palette based on num_colors parameter
+        colors = color_palette[:num_colors]
+        
+        # Randomly assign colors to each group
+        np.random.seed(42)  # For reproducibility; remove this line for true randomness
+        group_colors = np.random.choice(colors, size=len(self.branch_groups), replace=True)
+
+        for group_index, group in enumerate(self.branch_groups):
+            color = group_colors[group_index]
+            
+            for start, end, btype, diameter in group:
+                linewidth = max(0.5, diameter * 2.0)
+                ax.plot(
+                    *zip(start, end),
+                    color=color,
+                    linewidth=linewidth,
+                    alpha=0.9,
+                )
+                all_points.extend([start, end])
+
+        # Set plot limits to create a bounding box
+        pts = np.array(all_points)
+        max_range = (pts.max(axis=0) - pts.min(axis=0)).max() / 2.0
+        mid = (pts.max(axis=0) + pts.min(axis=0)) / 2.0
+        ax.set_xlim(mid[0] - max_range, mid[0] + max_range)
+        ax.set_ylim(mid[1] - max_range, mid[1] + max_range)
+        ax.set_zlim(mid[2] - max_range, mid[2] + max_range)
+
+        ax.set_xlabel("X")
+        ax.set_ylabel("Y")
+        ax.set_zlabel("Z")
+        ax.set_title(f"{title}\n{len(self.branch_groups)} groups with {num_colors} random colors")
+        ax.view_init(elev=elev, azim=azim)
+        plt.tight_layout()
+        plt.show()
+
 
 if __name__ == "__main__":
     np.random.seed(0)
     name, axiom, rule = ZONO_TREE
     lsystem = LSystem(axiom=axiom, rule=rule)
-    lsystem.iterate(iterations=7) # zono_tree = 7
-    
+    lsystem.iterate(iterations=7)
+
     lsystem.remove_symbol("A")
     string = lsystem.state
 
     print(f"Processing L-System for '{name}' with {len(string)} commands...")
     print(lsystem.get_rule_statistics())
 
-    # 2. Create the visualizer object, which processes the string automatically
-    tree_viz = LSystemTree(string, branch_length=0.2, angle_deg=22.5, initial_diameter=10.0, diameter_scale=0.85) # zono tree = 22.5
+    # Create the visualizer object
+    tree_viz = LSystemTree(
+        string,
+        branch_length=0.2,
+        angle_deg=22.5,
+        initial_diameter=10.0,
+        diameter_scale=0.85,
+    )
 
-    # 3. Visualize the generated branches
-    print("Creating 3D visualization...")
-    tree_viz.visualize_3d(title="Simplified 3D L-System Tree")
+    # Visualize regular branches
+    # print("\nCreating standard 3D visualization...")
+    # tree_viz.visualize_3d(title="Standard 3D L-System Tree")
+    
+    print(lsystem.estimate_branch_groups(lsystem.state))
+
+    # Visualize grouped branches with unique colors per group
+    print("\nCreating grouped branches visualization...")
+    tree_viz.visualize_grouped_branches(
+        title="Grouped Branches (Random Colors)",
+        num_colors=20,
+    )
+
