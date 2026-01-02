@@ -76,17 +76,47 @@ class LSystemTree:
             "|": Rotation.from_rotvec(np.pi * self.UP_AXIS),
         }
 
+    def _is_terminal_branch(self, string_index):
+        """
+        Determine if a branch at the given string index is terminal (green) or not (brown).
+        A branch is terminal if:
+        - No drawing symbol follows it at the same bracket level
+        - No sub-branch '[' starts after it at the same bracket level
+        """
+        drawing_symbols = {'F', 'S', 'L', 'A', 'I', 'C'}
+        bracket_depth = 0
+        
+        for j in range(string_index + 1, len(self.lsystem_string)):
+            next_char = self.lsystem_string[j]
+            
+            if next_char == '[':
+                if bracket_depth == 0:
+                    # A sub-branch is starting at our level - we're not terminal
+                    return False
+                bracket_depth += 1
+            elif next_char == ']':
+                if bracket_depth == 0:
+                    # We hit a closing bracket at our level - this is terminal
+                    return True
+                bracket_depth -= 1
+            elif next_char in drawing_symbols and bracket_depth == 0:
+                # Found another drawing symbol at the same bracket level
+                return False
+        
+        # Reached end of string without finding another branch at this level
+        return True
+
     def _generate_branches(self, position=np.array([0.0, 0.0, 0.0])):
         """
-        Parses the L-system string and returns branches grouped by alignment.
-        Each group contains branches that are in a straight line.
+        Parses the L-system string and returns branches grouped by alignment and color.
+        Each group contains branches that are in a straight line and have the same color.
         """
         branches = []  # For flat list compatibility
         stack = []
         orientation = Rotation.identity()
         current_diameter = self.initial_diameter
 
-        for char in self.lsystem_string:
+        for i, char in enumerate(self.lsystem_string):
             if char in self.rotations:
                 # Apply rotation by composing it with the current orientation
                 orientation = orientation * self.rotations[char]
@@ -110,8 +140,15 @@ class LSystemTree:
                 start_point = position
                 end_point = start_point + heading_vec * self.branch_length
 
-                # Store branch with its direction vector
-                new_branch = (start_point, end_point, char, current_diameter, heading_vec)
+                # Determine color: 'I' (trunk) is always brown, otherwise check if terminal
+                if char == 'I':
+                    color = 'B'  # Trunk segments are always brown
+                else:
+                    is_terminal = self._is_terminal_branch(i)
+                    color = 'G' if is_terminal else 'B'
+
+                # Store branch with its direction vector and color
+                new_branch = (start_point, end_point, char, current_diameter, heading_vec, color)
                 branches.append(new_branch)
                 position = end_point
 
@@ -119,22 +156,22 @@ class LSystemTree:
                 heading_vec = orientation.apply(self.FWD_AXIS)
                 position += heading_vec * self.branch_length
 
-        # Now group branches by direction AND spatial connectivity
+        # Now group branches by direction, spatial connectivity, AND color
         branch_groups = []
         used = [False] * len(branches)
         angle_threshold = np.radians(0.1)  # Small angle tolerance for alignment
         position_threshold = 1e-6  # Tolerance for end-to-start connection
 
-        for i, (start_i, end_i, type_i, diam_i, dir_i) in enumerate(branches):
+        for i, (start_i, end_i, type_i, diam_i, dir_i, color_i) in enumerate(branches):
             if used[i]:
                 continue
 
             # Start a new group with this branch
-            current_group = [(start_i, end_i, type_i, diam_i)]
+            current_group = [(start_i, end_i, type_i, diam_i, color_i)]
             used[i] = True
             current_end = end_i
 
-            # Try to extend the group by finding connected branches with similar direction
+            # Try to extend the group by finding connected branches with similar direction AND same color
             found_continuation = True
             while found_continuation:
                 found_continuation = False
@@ -143,18 +180,22 @@ class LSystemTree:
                     if used[j]:
                         continue
 
-                    start_j, end_j, type_j, diam_j, dir_j = branches[j]
+                    start_j, end_j, type_j, diam_j, dir_j, color_j = branches[j]
 
                     # Check if this branch connects to the end of our current chain
                     distance_to_current = np.linalg.norm(start_j - current_end)
                     
                     if distance_to_current < position_threshold:
+                        # Check if colors match
+                        if color_j != color_i:
+                            continue
+                        
                         # Check if directions are similar (angle between them is small)
                         dot_product = np.dot(dir_i, dir_j)
                         angle_diff = np.arccos(np.clip(dot_product, -1.0, 1.0))
 
                         if angle_diff < angle_threshold:
-                            current_group.append((start_j, end_j, type_j, diam_j))
+                            current_group.append((start_j, end_j, type_j, diam_j, color_j))
                             used[j] = True
                             current_end = end_j
                             found_continuation = True
@@ -162,8 +203,8 @@ class LSystemTree:
 
             branch_groups.append(current_group)
 
-        # Convert branches back to 4-tuple format (without direction vector)
-        branches = [(s, e, t, d) for s, e, t, d, _ in branches]
+        # Convert branches back to 5-tuple format (without direction vector, but with color)
+        branches = [(s, e, t, d, c) for s, e, t, d, _, c in branches]
 
         return branches, branch_groups
 
@@ -235,7 +276,7 @@ class LSystemTree:
         ax = fig.add_subplot(111, projection="3d")
 
         all_points = [np.array([0.0, 0.0, 0.0])]
-        for start, end, btype, diameter in self.branches:
+        for start, end, btype, diameter, color in self.branches:
             # Use diameter to set linewidth (with a minimum width)
             linewidth = max(0.5, diameter * 2.0)
             ax.plot(
@@ -268,12 +309,30 @@ class LSystemTree:
         elev=25,
         azim=-60,
         num_colors=20,
+        use_branch_colors=False,
     ):
-        """Visualizes branches grouped by their alignment with randomly assigned colors from a fixed palette."""
+        """
+        Visualizes branches grouped by their alignment.
+        
+        Args:
+            title: Plot title
+            figsize: Figure size tuple
+            elev: Elevation angle for 3D view
+            azim: Azimuth angle for 3D view
+            num_colors: Number of random colors to use (only if use_branch_colors=False)
+            use_branch_colors: If True, use actual branch colors (G=green, B=brown).
+                              If False, use random colors from palette for each group.
+        """
         fig = plt.figure(figsize=figsize)
         ax = fig.add_subplot(111, projection="3d")
 
         all_points = [np.array([0.0, 0.0, 0.0])]
+
+        # Color mapping for branch colors
+        branch_color_map = {
+            'G': 'green',
+            'B': 'saddlebrown',
+        }
 
         # Define a distinct color palette (20 visually distinct colors)
         color_palette = [
@@ -286,18 +345,23 @@ class LSystemTree:
         # Trim or extend palette based on num_colors parameter
         colors = color_palette[:num_colors]
         
-        # Randomly assign colors to each group
+        # Randomly assign colors to each group (only used if use_branch_colors=False)
         np.random.seed(42)  # For reproducibility; remove this line for true randomness
         group_colors = np.random.choice(colors, size=len(self.branch_groups), replace=True)
 
         for group_index, group in enumerate(self.branch_groups):
-            color = group_colors[group_index]
-            
-            for start, end, btype, diameter in group:
+            for start, end, btype, diameter, branch_color in group:
                 linewidth = max(0.5, diameter * 2.0)
+                
+                # Choose color based on mode
+                if use_branch_colors:
+                    plot_color = branch_color_map.get(branch_color, 'gray')
+                else:
+                    plot_color = group_colors[group_index]
+                
                 ax.plot(
                     *zip(start, end),
-                    color=color,
+                    color=plot_color,
                     linewidth=linewidth,
                     alpha=0.9,
                 )
@@ -314,7 +378,10 @@ class LSystemTree:
         ax.set_xlabel("X")
         ax.set_ylabel("Y")
         ax.set_zlabel("Z")
-        ax.set_title(f"{title}\n{len(self.branch_groups)} groups with {num_colors} random colors")
+        if use_branch_colors:
+            ax.set_title(f"{title}\n{len(self.branch_groups)} groups (Green/Brown branch colors)")
+        else:
+            ax.set_title(f"{title}\n{len(self.branch_groups)} groups with {num_colors} random colors")
         ax.view_init(elev=elev, azim=azim)
         plt.tight_layout()
         plt.show()
@@ -351,6 +418,7 @@ if __name__ == "__main__":
     print("\nCreating grouped branches visualization...")
     tree_viz.visualize_grouped_branches(
         title="Grouped Branches (Random Colors)",
-        num_colors=20,
+        num_colors=20,  
+        use_branch_colors=True
     )
 

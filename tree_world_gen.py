@@ -54,7 +54,7 @@ for i in range(0,num_worlds):
     all_branch_length_data = []
 
     print("\n--- Branch List ---")
-    print("Format: (start_point, end_point, branch_type, diameter)")
+    print("Format: (start_point, end_point, branch_type, diameter, color)")
 
     # Handle batched trees (list of branch lists)
     for tree_idx, tree_branches in enumerate(all_trees_list):
@@ -62,13 +62,14 @@ for i in range(0,num_worlds):
         
         
         # Create lists for the current batch
-        b_start, b_end, b_type, b_diameter = [], [], [], []
+        b_start, b_end, b_type, b_diameter, b_color = [], [], [], [], []
 
-        for start, end, btype, diameter in tree_branches:
+        for start, end, btype, diameter, color in tree_branches:
             b_start.append(start.tolist())
             b_end.append(end.tolist())
             b_type.append(btype)
             b_diameter.append(diameter)
+            b_color.append(color)
         
         # Append the dictionary for the current batch
         all_batches_data.append({
@@ -76,6 +77,7 @@ for i in range(0,num_worlds):
             "end": b_end,
             "btype": b_type,
             "diameter": b_diameter,
+            "color": b_color,
         })
         all_branch_length_data.append(len(tree_branches))
     
@@ -88,13 +90,14 @@ for i in range(0,num_worlds):
         
         for group_idx, group in enumerate(tree_grouped_branches):
             # Create lists for the current group
-            g_start, g_end, g_type, g_diameter = [], [], [], []
+            g_start, g_end, g_type, g_diameter, g_color = [], [], [], [], []
             
-            for start, end, btype, diameter in group:
+            for start, end, btype, diameter, color in group:
                 g_start.append(start.tolist())
                 g_end.append(end.tolist())
                 g_type.append(btype)
                 g_diameter.append(diameter)
+                g_color.append(color)
             
             # Append the dictionary for this group
             tree_groups.append({
@@ -102,6 +105,7 @@ for i in range(0,num_worlds):
                 "end": g_end,
                 "btype": g_type,
                 "diameter": g_diameter,
+                "color": g_color,
             })
         
         # Add this tree's grouped data
@@ -124,9 +128,9 @@ for i in range(0,num_worlds):
         "batches_grouped": all_batches_grouped_data,
         "batches": all_batches_data,
     }
-    os.makedirs(os.path.join(os.getcwd(), "results", "trees", "worlds"), exist_ok=True)
+    os.makedirs(os.path.join(os.getcwd(), "results", "trees", "worlds_color"), exist_ok=True)
 
-    with open(f"results/trees/worlds/lsystem_{i}_{name}.json", "w") as f:
+    with open(f"results/trees/worlds_color/lsystem_{i}_{name}.json", "w") as f:
         json.dump(stats, f, indent=2)
         
-    print(f"Saved to: results/trees/worlds/lsystem_{i}_{name}.json")
+    print(f"Saved to: results/trees/worlds_color/lsystem_{i}_{name}.json")
